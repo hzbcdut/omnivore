@@ -10,20 +10,6 @@ enum class TopLevelDestination(
     val titleTextId: Int,
     val route: String,
 ) {
-    DISCOVER(
-        selectedIcon = OmnivoreIcons.Discover,
-        unselectedIcon = OmnivoreIcons.DiscoverEmpty,
-        iconTextId = R.string.discover,
-        titleTextId = R.string.discover,
-        route = Routes.Discover.route
-    ),
-    FOLLOWING(
-        selectedIcon = OmnivoreIcons.Following,
-        unselectedIcon = OmnivoreIcons.FollowingEmpty,
-        iconTextId = R.string.following,
-        titleTextId = R.string.following,
-        route = Routes.Following.route
-    ),
     INBOX(
         selectedIcon = OmnivoreIcons.Inbox,
         unselectedIcon = OmnivoreIcons.InboxEmpty,

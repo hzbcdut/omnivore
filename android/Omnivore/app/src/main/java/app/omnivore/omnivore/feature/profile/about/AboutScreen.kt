@@ -76,34 +76,6 @@ internal fun AboutScreen(
 
             item {
                 TextPreferenceWidget(
-                    title = stringResource(R.string.about_documentation),
-                    onPreferenceClick = { navController.navigate(Routes.Documentation.route) },
-                )
-            }
-
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(R.string.about_feedback),
-                    onPreferenceClick = { settingsViewModel.presentIntercom() },
-                )
-            }
-
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(R.string.about_privacy_policy),
-                    onPreferenceClick = { navController.navigate(Routes.PrivacyPolicy.route) },
-                )
-            }
-
-            item {
-                TextPreferenceWidget(
-                    title = stringResource(R.string.about_terms_and_conditions),
-                    onPreferenceClick = { navController.navigate(Routes.TermsAndConditions.route) },
-                )
-            }
-
-            item {
-                TextPreferenceWidget(
                     title = stringResource(R.string.about_view_row_version),
                     subtitle = getVersionName(),
                     onPreferenceClick = {  },

@@ -2,7 +2,6 @@ package app.omnivore.omnivore.feature.root
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -20,15 +19,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -37,45 +32,21 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import app.omnivore.omnivore.R
-import app.omnivore.omnivore.core.designsystem.theme.OmnivoreBrand
-import app.omnivore.omnivore.feature.onboarding.OnboardingViewModel
-import app.omnivore.omnivore.feature.onboarding.OnboardingScreen
-import app.omnivore.omnivore.feature.discover.DiscoverScreen
-import app.omnivore.omnivore.feature.following.FollowingScreen
 import app.omnivore.omnivore.feature.library.LibraryView
 import app.omnivore.omnivore.feature.library.SearchView
 import app.omnivore.omnivore.feature.profile.SettingsScreen
 import app.omnivore.omnivore.feature.profile.about.AboutScreen
-import app.omnivore.omnivore.feature.profile.account.AccountScreen
-import app.omnivore.omnivore.feature.profile.discover_settings.DiscoverSettingsScreen
-import app.omnivore.omnivore.feature.profile.discover_settings.DiscoverSettingsViewModel
-import app.omnivore.omnivore.feature.profile.filters.FiltersScreen
-import app.omnivore.omnivore.feature.web.WebViewScreen
 import app.omnivore.omnivore.navigation.OmnivoreNavHost
 import app.omnivore.omnivore.navigation.Routes
 import app.omnivore.omnivore.navigation.TopLevelDestination
 
 @Composable
-fun RootView(
-    onboardingViewModel: OnboardingViewModel = hiltViewModel()
-) {
+fun RootView() {
 
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
 
-    val followingTabActive by onboardingViewModel.followingTabActiveState.collectAsStateWithLifecycle()
-    val discoverTabActive by onboardingViewModel.discoverTabActiveState.collectAsStateWithLifecycle()
-
-    val hasAuthToken by onboardingViewModel.hasAuthTokenState.collectAsStateWithLifecycle()
-
-    val destinations = TopLevelDestination.entries.filter {
-        (it.titleTextId === R.string.discover && discoverTabActive)  ||
-        (it.titleTextId === R.string.following && followingTabActive) ||
-                it.titleTextId !in intArrayOf(R.string.following, R.string.discover)
-
-    }
-
+    val destinations = TopLevelDestination.entries
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -89,7 +60,7 @@ fun RootView(
         }
     }) { padding ->
         Box(
-            modifier = if (!hasAuthToken) Modifier.background(OmnivoreBrand) else Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
@@ -99,17 +70,11 @@ fun RootView(
                     ),
                 )
         ) {
-            val startDestination = if (hasAuthToken) Routes.Home.route else Routes.Welcome.route
             PrimaryNavigator(
                 navController = navController,
                 snackbarHostState = snackbarHostState,
-                startDestination = startDestination
+                startDestination = Routes.Home.route
             )
-            LaunchedEffect(hasAuthToken) {
-                if (hasAuthToken) {
-                    onboardingViewModel.registerUser()
-                }
-            }
         }
     }
 }
@@ -128,10 +93,6 @@ fun PrimaryNavigator(
         startDestination = startDestination
     ) {
 
-        composable(Routes.Welcome.route) {
-            OnboardingScreen()
-        }
-
         navigation(
             startDestination = Routes.Inbox.route,
             route = Routes.Home.route,
@@ -145,14 +106,6 @@ fun PrimaryNavigator(
                 LibraryView(navController = navController)
             }
 
-            composable(Routes.Discover.route) {
-                DiscoverScreen(navController = navController)
-            }
-
-            composable(Routes.Following.route) {
-                FollowingScreen(navController = navController)
-            }
-
             composable(Routes.Settings.route) {
                 SettingsScreen(navController = navController)
             }
@@ -164,33 +117,6 @@ fun PrimaryNavigator(
 
         composable(Routes.About.route) {
             AboutScreen(navController = navController)
-        }
-
-        composable(Routes.Filters.route) {
-            FiltersScreen(navController = navController)
-        }
-
-        composable(Routes.DiscoverSettings.route) {
-            DiscoverSettingsScreen(navController = navController)
-        }
-
-        composable(Routes.Account.route) {
-            AccountScreen(
-                navController = navController,
-                snackbarHostState = snackbarHostState,
-            )
-        }
-
-        composable(Routes.Documentation.route) {
-            WebViewScreen(navController = navController, url = "https://docs.omnivore.work")
-        }
-
-        composable(Routes.PrivacyPolicy.route) {
-            WebViewScreen(navController = navController, url = "https://omnivore.work/privacy")
-        }
-
-        composable(Routes.TermsAndConditions.route) {
-            WebViewScreen(navController = navController, url = "https://omnivore.work/app/terms")
         }
     }
 }

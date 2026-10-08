@@ -32,4 +32,8 @@ interface SavedItemLabelDao {
     @Transaction
     @Query("SELECT * FROM SavedItemLabel WHERE name in (:names) ORDER BY name ASC")
     suspend fun namedLabels(names: List<String>): List<SavedItemLabel>
+
+    @Transaction
+    @Query("SELECT * FROM SavedItemLabel WHERE serverSyncStatus != 2 ORDER BY name ASC")
+    suspend fun allLabels(): List<SavedItemLabel>
 }

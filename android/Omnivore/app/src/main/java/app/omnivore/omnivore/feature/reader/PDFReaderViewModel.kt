@@ -3,41 +3,33 @@ package app.omnivore.omnivore.feature.reader
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.core.content.FileProvider
 import androidx.core.net.toFile
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.omnivore.omnivore.core.network.Networker
-import app.omnivore.omnivore.core.network.ReadingProgressParams
-import app.omnivore.omnivore.core.network.createHighlight
-import app.omnivore.omnivore.core.network.deleteHighlights
-import app.omnivore.omnivore.core.network.mergeHighlights
-import app.omnivore.omnivore.core.network.savedItem
-import app.omnivore.omnivore.core.network.updateHighlight
-import app.omnivore.omnivore.core.network.updateReadingProgress
+import app.omnivore.omnivore.core.data.CreateHighlightParams
 import app.omnivore.omnivore.core.data.DataService
+import app.omnivore.omnivore.core.data.DeleteHighlightParams
 import app.omnivore.omnivore.core.data.NanoId
-import app.omnivore.omnivore.graphql.generated.type.CreateHighlightInput
-import app.omnivore.omnivore.graphql.generated.type.MergeHighlightInput
-import app.omnivore.omnivore.graphql.generated.type.UpdateHighlightInput
+import app.omnivore.omnivore.core.data.MergeHighlightsParams
+import app.omnivore.omnivore.core.data.ReadingProgressParams
+import app.omnivore.omnivore.core.data.UpdateHighlightParams
+import app.omnivore.omnivore.core.data.createWebHighlight
+import app.omnivore.omnivore.core.data.deleteHighlightFromJSON
+import app.omnivore.omnivore.core.data.getUriForInternalFile
+import app.omnivore.omnivore.core.data.mergeWebHighlights
+import app.omnivore.omnivore.core.data.model.ServerSyncStatus
+import app.omnivore.omnivore.core.data.updateWebHighlight
 import app.omnivore.omnivore.core.database.entities.SavedItem
-import app.omnivore.omnivore.core.network.getUriForInternalFile
-import com.apollographql.apollo3.api.Optional
 import com.google.gson.Gson
 import com.pspdfkit.annotations.Annotation
 import com.pspdfkit.annotations.HighlightAnnotation
-import com.pspdfkit.document.download.DownloadJob
-import com.pspdfkit.document.download.DownloadRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
-import java.lang.Double.max
-import java.lang.Double.min
 import java.util.*
 import javax.inject.Inject
 
@@ -50,7 +42,6 @@ data class PDFReaderParams(
 @HiltViewModel
 class PDFReaderViewModel @Inject constructor(
   private val dataService: DataService,
-  private val networker: Networker,
   @ApplicationContext private val applicationContext: Context
 ): ViewModel() {
   var annotationUnderNoteEdit: Annotation? = null
@@ -61,11 +52,8 @@ class PDFReaderViewModel @Inject constructor(
   fun loadItem(slug: String, context: Context) {
     viewModelScope.launch {
       loadItemFromDB(slug, context)
-      loadItemFromNetwork(slug, context)
     }
   }
-
-
 
   private suspend fun loadItemFromDB(slug: String, context: Context) {
     withContext(Dispatchers.IO) {
@@ -98,61 +86,27 @@ class PDFReaderViewModel @Inject constructor(
     }
   }
 
-  private suspend fun loadItemFromNetwork(slug: String, context: Context) {
-    withContext(Dispatchers.IO) {
-      val articleQueryResult = networker.savedItem(context = applicationContext, slug)
-      val article = articleQueryResult.item ?: return@withContext
-      val request = DownloadRequest.Builder(context)
-        .uri(article.pageURLString)
-        .build()
-
-      val job = DownloadJob.startDownload(request)
-      job.setProgressListener(object : DownloadJob.ProgressListenerAdapter() {
-        override fun onComplete(output: File) {
-          val articleContent = ArticleContent(
-            title = article.title,
-            htmlContent = "",
-            highlights = articleQueryResult.highlights,
-            contentStatus = "SUCCEEDED",
-            labelsJSONString = Gson().toJson(articleQueryResult.labels)
-          )
-
-          currentReadingProgress = article.readingProgress
-          currentReadingPageIndex = article.readingProgressAnchor
-
-          pdfReaderParamsLiveData.postValue(
-            PDFReaderParams(
-              article,
-              articleContent,
-              Uri.fromFile(output)
-            )
-          )
-        }
-
-        override fun onError(exception: Throwable) {
-//      handleDownloadError(exception)
-        }
-      })
-    }
-  }
-
   fun reset() {
     pdfReaderParamsLiveData.postValue(null)
   }
 
   fun syncPageChange(currentPageIndex: Int, totalPages: Int) {
     val rawProgress = ((currentPageIndex + 1).toDouble() / totalPages.toDouble()) * 100
-    val percent = min(100.0, max(0.0, rawProgress))
+    val percent = minOf(100.0, maxOf(0.0, rawProgress))
     currentReadingProgress = percent
     currentReadingPageIndex = currentPageIndex
     viewModelScope.launch {
-      val params = ReadingProgressParams(
-        id = pdfReaderParamsLiveData.value?.item?.savedItemId,
-        readingProgressPercent = percent,
-        readingProgressAnchorIndex = currentPageIndex,
-        force = true
-      )
-      networker.updateReadingProgress(params)
+      val savedItemId = pdfReaderParamsLiveData.value?.item?.savedItemId ?: return@launch
+      withContext(Dispatchers.IO) {
+        val savedItem = dataService.db.savedItemDao().findById(savedItemId) ?: return@withContext
+        dataService.db.savedItemDao().update(
+          savedItem.copy(
+            readingProgress = percent,
+            readingProgressAnchor = currentPageIndex,
+            serverSyncStatus = ServerSyncStatus.IS_SYNCED.rawValue
+          )
+        )
+      }
     }
   }
 
@@ -170,33 +124,36 @@ class PDFReaderViewModel @Inject constructor(
     newAnnotation.customData = JSONObject().put("omnivoreHighlight", jsonValues)
 
     if (overlapIds.isNotEmpty()) {
-      val input = MergeHighlightInput(
-        annotation = Optional.Absent, // TODO: make sure we preserve note locally
-        articleId = itemID,
+      val params = MergeHighlightsParams(
+        shortId = shortId,
         id = highlightID,
-        overlapHighlightIdList = overlapIds,
-        patch = newAnnotation.toInstantJson(),
         quote = quote,
-        shortId = shortId
+        patch = newAnnotation.toInstantJson(),
+        articleId = itemID,
+        prefix = null,
+        suffix = null,
+        overlapHighlightIdList = overlapIds,
+        annotation = note
       )
 
       viewModelScope.launch {
-        networker.mergeHighlights(input)
+        dataService.mergeWebHighlights(Gson().toJson(params))
       }
     } else {
-      val createHighlightInput = CreateHighlightInput(
-        annotation = Optional.presentIfNotNull(note),
-        articleId = itemID,
-        id = highlightID,
-        patch = Optional.presentIfNotNull(newAnnotation.toInstantJson()),
-        quote = Optional.presentIfNotNull(quote),
+      val params = CreateHighlightParams(
+        type = "HIGHLIGHT",
         shortId = shortId,
-        highlightPositionAnchorIndex = Optional.presentIfNotNull(currentReadingPageIndex),
-        highlightPositionPercent = Optional.presentIfNotNull(currentReadingProgress)
+        id = highlightID,
+        quote = quote,
+        patch = newAnnotation.toInstantJson(),
+        articleId = itemID,
+        annotation = note,
+        highlightPositionAnchorIndex = currentReadingPageIndex,
+        highlightPositionPercent = currentReadingProgress
       )
 
       viewModelScope.launch {
-        networker.createHighlight(createHighlightInput)
+        dataService.createWebHighlight(Gson().toJson(params), colorName = null)
       }
 
       if (note != null) {
@@ -209,15 +166,17 @@ class PDFReaderViewModel @Inject constructor(
     // Save the updated note locally
     storeUpdatedNoteLocally(annotation, note)
 
-    // Sync update with data service
+    val highlightID = pluckHighlightID(annotation) ?: return
+    val itemID = pdfReaderParamsLiveData.value?.item?.savedItemId ?: return
+
     viewModelScope.launch {
-      val input = UpdateHighlightInput(
-        annotation = Optional.presentIfNotNull(note),
-        highlightId = pluckHighlightID(annotation) ?: "",
-        sharedAt = Optional.Absent
+      val params = UpdateHighlightParams(
+        highlightId = highlightID,
+        libraryItemId = itemID,
+        annotation = note,
+        sharedAt = null
       )
-      networker.updateHighlight(input)
-      Log.d("network", "updated $annotation")
+      dataService.updateWebHighlight(Gson().toJson(params))
     }
   }
 
@@ -232,9 +191,10 @@ class PDFReaderViewModel @Inject constructor(
 
   fun deleteHighlight(annotation: Annotation) {
     val highlightID = pluckHighlightID(annotation) ?: return
+    val itemID = pdfReaderParamsLiveData.value?.item?.savedItemId ?: return
     viewModelScope.launch {
-      networker.deleteHighlights(listOf(highlightID))
-      Log.d("network", "deleted $annotation")
+      val params = DeleteHighlightParams(highlightId = highlightID, libraryItemId = itemID)
+      dataService.deleteHighlightFromJSON(Gson().toJson(params))
     }
   }
 

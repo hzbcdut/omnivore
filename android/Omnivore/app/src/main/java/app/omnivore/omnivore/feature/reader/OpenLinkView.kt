@@ -42,12 +42,6 @@ fun OpenLinkView(webReaderViewModel: WebReaderViewModel) {
             }
         }
         Row {
-            Button(onClick = { webReaderViewModel.saveCurrentLink(context) }, modifier = Modifier.fillMaxWidth()) {
-                Text(text = stringResource(R.string.open_link_view_action_save_to_omnivore))
-
-            }
-        }
-        Row {
             Button(onClick = {webReaderViewModel.copyCurrentLink(context) }, modifier = Modifier.fillMaxWidth()) {
                 Text(text = stringResource(R.string.open_link_view_action_copy_link))
             }

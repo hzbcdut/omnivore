@@ -23,4 +23,5 @@ const val discoverShowHidden = "discoverShowHidden"
 const val volumeForScroll = "volumeForScroll"
 const val rtlText = "rtlText"
 const val doubleTapTurn = "doubleTapTurn"
+const val localScanDirUri = "localScanDirUri"
 

@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">Omnivore</string>
+
+    <!-- PSPDFKit license (a blank value falls back to the free trial). -->
+    <string name="pspdfkit_license_key">unset</string>
+
     <string name="welcome_title">Never miss a great read</string>
     <string name="learn_more">Learn More</string>
     <string name="welcome_subtitle">Save articles and read them later in our distraction-free reader.</string>
@@ -227,6 +231,8 @@
     <string name="about_privacy_policy">Privacy Policy</string>
     <string name="about_terms_and_conditions">Terms and Conditions</string>
 
+    <string name="profile_import_directory">Choose import folder</string>
+    <string name="profile_rescan_now">Rescan now</string>
     <string name="profile_filters">Filters</string>
     <string name="profile_discover">Discover</string>
     <string name="profile_manage_account">Manage Account</string>
