@@ -233,6 +233,7 @@
 
     <string name="profile_import_directory">Choose import folder</string>
     <string name="profile_rescan_now">Rescan now</string>
+    <string name="import_document_failed">Couldn\'t import that file</string>
     <string name="profile_filters">Filters</string>
     <string name="profile_discover">Discover</string>
     <string name="profile_manage_account">Manage Account</string>

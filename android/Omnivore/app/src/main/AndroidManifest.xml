@@ -38,7 +38,9 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
 
-            <!-- File manager "Open with" -->
+            <!-- File manager "Open with". Only content:// is advertised: since
+                 API 24 no app may send file:// uris, and scoped storage blocks
+                 raw filesystem paths to shared storage anyway. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -46,7 +48,6 @@
                 <data android:mimeType="application/xhtml+xml" />
                 <data android:mimeType="application/pdf" />
                 <data android:scheme="content" />
-                <data android:scheme="file" />
             </intent-filter>
         </activity>
 

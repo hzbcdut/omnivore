@@ -3,6 +3,7 @@ package app.omnivore.omnivore
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -79,7 +80,15 @@ class MainActivity : ComponentActivity() {
         } ?: return
 
         lifecycleScope.launch {
-            val item = localHtmlImporter.importUri(uri) ?: return@launch
+            val item = localHtmlImporter.importUri(uri)
+            if (item == null) {
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.import_document_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
             val activityClass = if (item.contentReader == "PDF") {
                 PDFReaderActivity::class.java
             } else {

@@ -155,9 +155,30 @@ class LocalHtmlImporter @Inject constructor(
     }
 
     private fun localIdFor(uri: Uri): String {
-        val digest = MessageDigest.getInstance("SHA-1").digest(uri.toString().toByteArray(Charsets.UTF_8))
+        val key = canonicalKey(uri)
+        val digest = MessageDigest.getInstance("SHA-1").digest(key.toByteArray(Charsets.UTF_8))
         val hex = digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
         return "local-$hex"
+    }
+
+    /**
+     * Identity of a local document.
+     *
+     * SAF hands out different uri shapes for the same file depending on how it
+     * was reached — the picker yields `media.documents/document:NN`, a tree scan
+     * yields `externalstorage.documents/tree/.../document/primary:.../name.ext`.
+     * Keying the id on the raw uri split one file into two items, and keying it
+     * on name+length split it again as soon as the file was edited. The display
+     * name is the one thing every representation of a document agrees on, so
+     * that is the key.
+     *
+     * Trade-off: two different files with the same name in different folders map
+     * to the same item — the later import refreshes the earlier one. The plan
+     * deliberately skips content hashing, so this is the intended simplicity.
+     */
+    private fun canonicalKey(uri: Uri): String {
+        displayName(uri)?.let { return "name:$it" }
+        return "uri:$uri"
     }
 
     private fun extractHtmlTitle(html: String): String? =
