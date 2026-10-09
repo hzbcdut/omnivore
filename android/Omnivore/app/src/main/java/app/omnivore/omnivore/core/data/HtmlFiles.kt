@@ -39,11 +39,9 @@ fun writeToInternalStorage(context: Context, bytes: ByteArray, fileName: String)
 
 fun readFromInternalStorage(context: Context, fileName: String): String? {
     return try {
-        context.openFileInput(fileName).bufferedReader().useLines { lines ->
-            lines.fold("") { some, text ->
-                "$some\n$text"
-            }
-        }
+        // Read the whole stream in one go. Concatenating per line is O(n^2) in
+        // the file size and blows up on multi-megabyte imports.
+        context.openFileInput(fileName).use { it.readBytes().toString(Charsets.UTF_8) }
     } catch (e: Exception) {
         Log.e("FileRead", "Error reading file", e)
         null

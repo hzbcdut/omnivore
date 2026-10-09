@@ -49,7 +49,7 @@ class LocalHtmlImporter @Inject constructor(
 
         val savedItemId = localIdFor(uri)
         val fileName = displayName(uri) ?: "$savedItemId.${kind.extension}"
-        val title = if (kind == LocalDocumentKind.HTML) extractHtmlTitle(String(bytes, Charsets.UTF_8)) ?: fileName else fileName
+        val title = if (kind == LocalDocumentKind.HTML) extractHtmlTitle(bytes) ?: fileName else fileName
 
         // Persist content under the ids both readers resolve on disk.
         writeToInternalStorage(context, bytes, "$savedItemId.${kind.extension}")
@@ -181,10 +181,22 @@ class LocalHtmlImporter @Inject constructor(
         return "uri:$uri"
     }
 
-    private fun extractHtmlTitle(html: String): String? =
-        titleRegex.find(html)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+    /**
+     * Scans only the head of the document for `<title>`. A bookmark archive can
+     * be tens of megabytes of base64 payloads after the head, and we must not
+     * turn the whole thing into a String just to find a tag that always lives
+     * near the top.
+     */
+    private fun extractHtmlTitle(bytes: ByteArray): String? {
+        val limit = minOf(bytes.size, TITLE_SCAN_BYTES)
+        val head = String(bytes, 0, limit, Charsets.UTF_8)
+        return titleRegex.find(head)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     private companion object {
+        /** `<title>` is always in the document head; no need to scan past this. */
+        const val TITLE_SCAN_BYTES = 64 * 1024
+
         val titleRegex = Regex(
             "<title[^>]*>(.*?)</title>",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
