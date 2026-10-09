@@ -2,6 +2,8 @@ package app.omnivore.omnivore.feature.library
 
 import android.content.Intent
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FloatTweenSpec
 import androidx.compose.animation.core.animateFloatAsState
@@ -62,15 +64,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import app.omnivore.omnivore.core.database.entities.SavedItemLabel
 import app.omnivore.omnivore.core.database.entities.SavedItemWithLabelsAndHighlights
-import app.omnivore.omnivore.feature.components.AddLinkSheetContent
 import app.omnivore.omnivore.feature.components.LabelsSelectionSheetContent
 import app.omnivore.omnivore.feature.components.LabelsViewModel
 import app.omnivore.omnivore.feature.editinfo.EditInfoSheetContent
 import app.omnivore.omnivore.feature.editinfo.EditInfoViewModel
 import app.omnivore.omnivore.feature.reader.PDFReaderActivity
 import app.omnivore.omnivore.feature.reader.WebReaderLoadingContainerActivity
-import app.omnivore.omnivore.feature.save.SaveState
-import app.omnivore.omnivore.feature.save.SaveViewModel
 import app.omnivore.omnivore.feature.savedItemViews.SavedItemCard
 import app.omnivore.omnivore.navigation.Routes
 import app.omnivore.omnivore.navigation.TopLevelDestination
@@ -82,7 +81,6 @@ import kotlinx.coroutines.launch
 internal fun LibraryView(
     navController: NavHostController,
     labelsViewModel: LabelsViewModel = hiltViewModel(),
-    saveViewModel: SaveViewModel = hiltViewModel(),
     editInfoViewModel: EditInfoViewModel = hiltViewModel(),
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
@@ -98,6 +96,11 @@ internal fun LibraryView(
     }
 
     val labels by viewModel.labelsState.collectAsStateWithLifecycle()
+    val importDocumentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importHtmlUri(it) }
+    }
     val currentTopLevelDestination =
         TopLevelDestination.entries.find { it.route == navController.currentDestination?.route }
     val selectedItem: SavedItemWithLabelsAndHighlights? by viewModel.actionsMenuItemLiveData.observeAsState()
@@ -107,12 +110,6 @@ internal fun LibraryView(
     val bottomSheetState: LibraryBottomSheetState by viewModel.bottomSheetState.collectAsStateWithLifecycle()
 
     when (bottomSheetState) {
-        LibraryBottomSheetState.ADD_LINK -> {
-            AddLinkBottomSheet(saveViewModel) {
-                viewModel.bottomSheetState.value = LibraryBottomSheetState.HIDDEN
-            }
-        }
-
         LibraryBottomSheetState.LABEL -> {
             LabelBottomSheet(deleteCurrentItem = { viewModel.currentItem.value = null },
                 labels = labels,
@@ -150,7 +147,9 @@ internal fun LibraryView(
                 savedItemViewModel = viewModel,
                 onSearchClicked = { navController.navigate(Routes.Search.route) },
                 onAddLinkClicked = {
-                    viewModel.bottomSheetState.value = LibraryBottomSheetState.ADD_LINK
+                    importDocumentLauncher.launch(
+                        arrayOf("text/html", "application/xhtml+xml", "application/pdf")
+                    )
                 })
         },
     ) { paddingValues ->
@@ -164,7 +163,7 @@ internal fun LibraryView(
                     updateSavedItemSortFilter = { viewModel.updateSavedItemSortFilter(it) },
                     setBottomSheetState = { viewModel.setBottomSheetState(it) },
                     updateAppliedLabels = { viewModel.updateAppliedLabels(it) },
-                    isFollowingScreen = currentTopLevelDestination == TopLevelDestination.FOLLOWING,
+                    isFollowingScreen = false,
                     { viewModel.actionsMenuItemLiveData.postValue(null) },
                     savedItemViewModel = viewModel,
                     refresh = { viewModel.refresh() },
@@ -254,29 +253,6 @@ fun LabelBottomSheet(
                     createNewSavedItemLabel(newLabelName, labelHexValue)
                 })
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddLinkBottomSheet(
-    saveViewModel: SaveViewModel, onDismiss: () -> Unit = {}
-) {
-    ModalBottomSheet(
-        onDismissRequest = { onDismiss() },
-        containerColor = MaterialTheme.colorScheme.background,
-        sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true
-        ),
-    ) {
-
-        AddLinkSheetContent(viewModel = saveViewModel, onCancel = {
-            saveViewModel.state.value = SaveState.DEFAULT
-            onDismiss()
-        }, onLinkAdded = {
-            saveViewModel.state.value = SaveState.DEFAULT
-            onDismiss()
-        })
     }
 }
 

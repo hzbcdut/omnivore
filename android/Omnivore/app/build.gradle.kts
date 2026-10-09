@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.org.jetbrains.kotlin.android)
     id("dagger.hilt.android.plugin")
     alias(libs.plugins.ksp)
-    alias(libs.plugins.apollo)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -57,24 +56,10 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "OMNIVORE_API_URL", "\"https://api-demo.omnivore.work\"")
-            buildConfigField("String", "OMNIVORE_WEB_URL", "\"https://demo.omnivore.work\"")
-            buildConfigField(
-                "String",
-                "OMNIVORE_GAUTH_SERVER_CLIENT_ID",
-                "\"267918240109-eu2ar09unac3lqqigluknhk7t0021b54.apps.googleusercontent.com\""
-            )
         }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField("String", "OMNIVORE_API_URL", "\"https://api-prod.omnivore.work\"")
-            buildConfigField("String", "OMNIVORE_WEB_URL", "\"https://omnivore.work\"")
-            buildConfigField(
-                "String",
-                "OMNIVORE_GAUTH_SERVER_CLIENT_ID",
-                "\"687911924401-lq8j1e97n0sv3khhb8g8n368lk4dqkbp.apps.googleusercontent.com\""
-            )
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
@@ -104,9 +89,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
 
-    implementation(libs.androidx.credentials.auth)
-    implementation(libs.androidx.credentials)
-    implementation(libs.googleid)
 
     val bom = platform(libs.androidx.compose.bom)
     implementation(bom)
@@ -135,18 +117,16 @@ dependencies {
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.compose.runtime.livedata)
 
-    implementation(libs.retrofit.core)
-    implementation(libs.retrofit.converter.gson)
 
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.dataStore.preferences)
+    implementation(libs.androidx.documentfile)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    implementation(libs.apollo.runtime)
 
     implementation(libs.accompanist.flowlayout)
 
@@ -159,8 +139,6 @@ dependencies {
 
     implementation(libs.gson)
     implementation(libs.pspdfkit)
-    implementation(libs.posthog)
-    implementation(libs.intercom)
     implementation(libs.compose.markdown)
     implementation(libs.chiptextfield.m3)
 
@@ -168,18 +146,6 @@ dependencies {
 
     implementation(libs.androidx.core.splashscreen)
 
-    implementation(libs.work.runtime.ktx)
-    implementation(libs.hilt.work)
-    ksp(libs.hilt.work.compiler)
-}
-
-apollo {
-    service("service") {
-        outputDirConnection {
-            connectToKotlinSourceSet("main")
-        }
-        packageName.set("app.omnivore.omnivore.graphql.generated")
-    }
 }
 
 tasks.register("printVersion") {

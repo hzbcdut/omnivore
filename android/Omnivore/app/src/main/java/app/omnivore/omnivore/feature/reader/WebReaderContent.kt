@@ -84,7 +84,7 @@ data class WebReaderContent(
               <meta charset="utf-8" />
               <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no' />
                 <style>
-                  @import url("$highlightCssFilePath");
+                  @import url("file:///android_asset/$highlightCssFilePath");
                   $rtlCss
                 </style>
             </head>
@@ -129,9 +129,9 @@ data class WebReaderContent(
                 window.fullPageScroll = ${preferences.fullPageScroll}
                 window.enableHighlightBar = false
               </script>
-              <script src="bundle.js"></script>
-              <script src="mathJaxConfiguration.js" id="MathJax-script"></script>
-              <script src="mathjax.js" id="MathJax-script"></script>
+              <script src="file:///android_asset/bundle.js"></script>
+              <script src="file:///android_asset/mathJaxConfiguration.js" id="MathJax-script"></script>
+              <script src="file:///android_asset/mathjax.js" id="MathJax-script"></script>
             </body>
           </html>
     """

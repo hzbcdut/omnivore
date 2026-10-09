@@ -1,6 +1,9 @@
 package app.omnivore.omnivore
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,15 +12,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import app.omnivore.omnivore.core.data.LocalHtmlImporter
+import app.omnivore.omnivore.feature.reader.PDFReaderActivity
+import app.omnivore.omnivore.feature.reader.WebReaderLoadingContainerActivity
 import app.omnivore.omnivore.feature.root.RootView
 import app.omnivore.omnivore.feature.theme.OmnivoreTheme
 import com.pspdfkit.PSPDFKit
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var localHtmlImporter: LocalHtmlImporter
+
     override fun onCreate(savedInstanceState: Bundle?) {
 
         installSplashScreen()
@@ -45,6 +55,48 @@ class MainActivity : ComponentActivity() {
                     RootView()
                 }
             }
+        }
+
+        handleIncomingDocument(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingDocument(intent)
+    }
+
+    /**
+     * Accepts `ACTION_SEND` / `ACTION_VIEW` for local .html / .pdf documents and
+     * drops the reader straight into the imported item.
+     */
+    private fun handleIncomingDocument(intent: Intent?) {
+        val uri: Uri = when (intent?.action) {
+            Intent.ACTION_SEND ->
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            Intent.ACTION_VIEW -> intent.data
+            else -> null
+        } ?: return
+
+        lifecycleScope.launch {
+            val item = localHtmlImporter.importUri(uri)
+            if (item == null) {
+                Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.import_document_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            val activityClass = if (item.contentReader == "PDF") {
+                PDFReaderActivity::class.java
+            } else {
+                WebReaderLoadingContainerActivity::class.java
+            }
+            startActivity(
+                Intent(this@MainActivity, activityClass).putExtra("SAVED_ITEM_SLUG", item.slug)
+            )
         }
     }
 }

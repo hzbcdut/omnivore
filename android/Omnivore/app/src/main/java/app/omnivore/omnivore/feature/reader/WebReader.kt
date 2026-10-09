@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.view.*
@@ -27,6 +28,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.*
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -160,14 +162,14 @@ fun WebReader(
 
                 addJavascriptInterface(javascriptInterface, "AndroidWebKitMessenger")
 
-                loadDataWithBaseURL(
-                    "file:///android_asset/",
-                    styledContent,
-                    "text/html; charset=utf-8",
-                    "utf-8",
-                    null
-                )
-                Log.d("HTMLContent", styledContent)
+                // Load from a file instead of loadDataWithBaseURL: the latter
+                // silently drops payloads past a few megabytes, and a bookmark
+                // archive with inlined base64 images is tens of megabytes.
+                // Asset URLs in the template are absolute, so they still resolve.
+                val readerPage = File(context.cacheDir, "reader-page.html")
+                readerPage.writeText(styledContent)
+                loadUrl(Uri.fromFile(readerPage).toString())
+                Log.d("HTMLContent", "loaded ${styledContent.length} chars from $readerPage")
                 requestFocus()
                 setOnKeyListener { _, keyCode, event ->
                     if (event.action == KeyEvent.ACTION_DOWN) {

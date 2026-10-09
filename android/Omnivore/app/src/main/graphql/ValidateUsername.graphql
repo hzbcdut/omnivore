@@ -1,3 +1,0 @@
-query ValidateUsername($username: String!) {
-    validateUsername(username: $username)
-}

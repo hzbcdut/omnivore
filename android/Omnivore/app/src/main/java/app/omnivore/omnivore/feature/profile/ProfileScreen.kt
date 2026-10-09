@@ -1,5 +1,7 @@
 package app.omnivore.omnivore.feature.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -11,14 +13,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import app.omnivore.omnivore.R
 import app.omnivore.omnivore.core.designsystem.component.TextPreferenceWidget
-import app.omnivore.omnivore.feature.onboarding.OnboardingViewModel
 import app.omnivore.omnivore.navigation.Routes
 
 internal const val RELEASE_URL = "https://github.com/omnivore-app/omnivore/releases"
@@ -27,7 +26,7 @@ internal const val RELEASE_URL = "https://github.com/omnivore-app/omnivore/relea
 @Composable
 internal fun SettingsScreen(
     navController: NavHostController,
-    onboardingViewModel: OnboardingViewModel = hiltViewModel()
+    profileViewModel: ProfileViewModel = hiltViewModel()
 ) {
     Scaffold(topBar = {
         TopAppBar(
@@ -38,7 +37,7 @@ internal fun SettingsScreen(
         )
     }) { paddingValues ->
         SettingsViewContent(
-            onboardingViewModel = onboardingViewModel,
+            profileViewModel = profileViewModel,
             navController = navController,
             paddingValues = paddingValues
         )
@@ -47,11 +46,15 @@ internal fun SettingsScreen(
 
 @Composable
 fun SettingsViewContent(
-    onboardingViewModel: OnboardingViewModel,
+    profileViewModel: ProfileViewModel,
     navController: NavHostController,
     paddingValues: PaddingValues
 ) {
-    val showLogoutDialog = remember { mutableStateOf(false) }
+    val scanDirLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let { profileViewModel.chooseScanDir(it) }
+    }
 
     val state = rememberLazyListState()
 
@@ -62,33 +65,19 @@ fun SettingsViewContent(
 
         item {
             TextPreferenceWidget(
-                title = stringResource(R.string.profile_filters),
-                onPreferenceClick = { navController.navigate(Routes.Filters.route) },
+                title = stringResource(R.string.profile_import_directory),
+                onPreferenceClick = { scanDirLauncher.launch(null) },
             )
         }
 
         item {
             TextPreferenceWidget(
-                title = stringResource(R.string.profile_discover),
-                onPreferenceClick = { navController.navigate(Routes.DiscoverSettings.route) },
+                title = stringResource(R.string.profile_rescan_now),
+                onPreferenceClick = { profileViewModel.rescanNow() },
             )
         }
 
         item { HorizontalDivider() }
-
-        item {
-            TextPreferenceWidget(
-                title = stringResource(R.string.profile_manage_account),
-                onPreferenceClick = { navController.navigate(Routes.Account.route) },
-            )
-        }
-
-        item {
-            TextPreferenceWidget(
-                title = stringResource(R.string.about_logout),
-                onPreferenceClick = { showLogoutDialog.value = true },
-            )
-        }
 
         item {
             TextPreferenceWidget(
@@ -97,14 +86,4 @@ fun SettingsViewContent(
             )
         }
     }
-
-    if (showLogoutDialog.value) {
-        LogoutDialog { performLogout ->
-            if (performLogout) {
-                onboardingViewModel.logout()
-            }
-            showLogoutDialog.value = false
-        }
-    }
 }
-

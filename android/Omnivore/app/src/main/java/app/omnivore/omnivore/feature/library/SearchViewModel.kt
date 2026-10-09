@@ -7,22 +7,19 @@ import androidx.lifecycle.viewModelScope
 import app.omnivore.omnivore.core.data.DataService
 import app.omnivore.omnivore.core.data.archiveSavedItem
 import app.omnivore.omnivore.core.data.deleteSavedItem
-import app.omnivore.omnivore.core.data.isSavedItemContentStoredInDB
-import app.omnivore.omnivore.core.data.librarySearch
+import app.omnivore.omnivore.core.data.model.LibraryQuery
 import app.omnivore.omnivore.core.data.repository.LibraryRepository
 import app.omnivore.omnivore.core.data.unarchiveSavedItem
 import app.omnivore.omnivore.core.database.entities.SavedItemLabel
 import app.omnivore.omnivore.core.database.entities.SavedItemWithLabelsAndHighlights
 import app.omnivore.omnivore.core.database.entities.TypeaheadCardData
-import app.omnivore.omnivore.core.datastore.DatastoreRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -34,13 +31,9 @@ import javax.inject.Inject
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val dataService: DataService,
-    private val datastoreRepo: DatastoreRepository,
     private val repository: LibraryRepository,
     @ApplicationContext private val applicationContext: Context
 ) : ViewModel(), SavedItemViewModel {
-    private val contentRequestChannel = Channel<String>(capacity = Channel.UNLIMITED)
-
-    private var librarySearchCursor: String? = null
 
     var isRefreshing = MutableStateFlow(false)
     val typeaheadMode = MutableStateFlow(true)
@@ -61,14 +54,13 @@ class SearchViewModel @Inject constructor(
                 }
             }.launchIn(viewModelScope)
     }
+
     fun updateSearchText(text: String) {
         typeaheadMode.update { true }
         searchTextFlow.update { text }
     }
 
     fun performSearch() {
-        // To perform search we just clear the current state, so the LibraryView infinite scroll
-        // load will update items.
         viewModelScope.launch {
             isRefreshing.update { true }
             itemsState.update { (listOf()) }
@@ -81,51 +73,19 @@ class SearchViewModel @Inject constructor(
     private fun loadUsingSearchAPI() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val result = dataService.librarySearch(
-                    context = applicationContext,
-                    cursor = librarySearchCursor,
-                    query = searchQueryString()
+                val needle = searchTextFlow.value.trim()
+                val query = LibraryQuery(
+                    folders = listOf("inbox"),
+                    allowedArchiveStates = listOf(0, 1),
+                    sortKey = "newest",
+                    requiredLabels = listOf(),
+                    excludedLabels = listOf(),
+                    allowedContentReaders = listOf("WEB", "PDF", "EPUB")
                 )
-                result.cursor?.let {
-                    librarySearchCursor = it
+                val matches = repository.getSavedItems(query).first().filter {
+                    needle.isEmpty() || it.savedItem.title.contains(needle, ignoreCase = true)
                 }
-
-                result.savedItems.map {
-                    val isSavedInDB = dataService.isSavedItemContentStoredInDB(applicationContext, it.savedItem.slug)
-
-                    if (!isSavedInDB) {
-                        delay(2000)
-                        contentRequestChannel.send(it.savedItem.slug)
-                    }
-                }
-
-                val newItems = result.savedItems
-                /*
-                .map {
-                SavedItemCardDataWithLabels(
-                    cardData = SavedItemCardData(
-                        savedItemId = it.savedItem.savedItemId,
-                        slug = it.savedItem.slug,
-                        publisherURLString = it.savedItem.publisherURLString,
-                        title = it.savedItem.title,
-                        author = it.savedItem.author,
-                        imageURLString = it.savedItem.imageURLString,
-                        isArchived = it.savedItem.isArchived,
-                        pageURLString = it.savedItem.pageURLString,
-                        contentReader = it.savedItem.contentReader,
-                        savedAt = it.savedItem.savedAt,
-                        readingProgress = it.savedItem.readingProgress,
-                        wordsCount = it.savedItem.wordsCount
-                    ),
-                    labels = listOf()
-                )
-            }
-            */
-
-                itemsState.update {
-                    it + newItems
-                }
-
+                itemsState.update { matches }
                 isRefreshing.update { false }
             }
         }
@@ -177,31 +137,8 @@ class SearchViewModel @Inject constructor(
     }
 
     fun updateSavedItemLabels(savedItemID: String, labels: List<SavedItemLabel>) {
-//        viewModelScope.launch {
-//            withContext(Dispatchers.IO) {
-//                val input = SetLabelsInput(labelIds = labels.map { it.savedItemLabelId }, pageId = savedItemID)
-//                val networkResult = networker.updateLabelsForSavedItem(input)
-//
-//                // TODO: assign a server sync status to these
-//                val crossRefs = labels.map {
-//                    SavedItemAndSavedItemLabelCrossRef(
-//                        savedItemLabelId = it.savedItemLabelId,
-//                        savedItemId = savedItemID
-//                    )
-//                }
-//
-//                // Remove all labels first
-//                dataService.db.savedItemAndSavedItemLabelCrossRefDao().deleteRefsBySavedItemId(savedItemID)
-//
-//                // Add back the current labels
-//                dataService.db.savedItemAndSavedItemLabelCrossRefDao().insertAll(crossRefs)
-//
-//                CoroutineScope(Dispatchers.Main).launch {
-//                    handleFilterChanges()
-//                }
-//            }
-//        }
+        viewModelScope.launch {
+            repository.setSavedItemLabels(savedItemID, labels)
+        }
     }
-
-    private fun searchQueryString() = " ${searchTextFlow.value.ifBlank { "" }}"
 }
